@@ -6,14 +6,19 @@ secrets.json
 *.pem
 *.key
 
-# Workspace - your scratch space (not committed)
-# Only job.md and session logs are tracked
+# Workspace structure:
+#   workspace/job.md  - your task (tracked)
+#   workspace/logs/   - session logs (tracked)
+#   workspace/tmp/    - temporary files (NOT tracked)
 workspace/*
 !workspace/job.md
 !workspace/logs
+!workspace/tmp
 workspace/logs/*
+workspace/tmp/*
 !workspace/logs/*.jsonl
 !workspace/logs/.gitkeep
+!workspace/tmp/.gitkeep
 
 .claude/*
 
