@@ -1,42 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect } from 'react';
 import { UserIcon, PlusIcon, TrashIcon } from './icons.js';
+import { Dialog, EmptyState, formatDate } from './settings-shared.js';
 import { getUsers, addUser, editUser, removeUser, resetPassword } from '../../auth/actions.js';
-
-function formatDate(ts) {
-  if (!ts) return '';
-  return new Date(ts).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function Dialog({ open, onClose, title, children }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div ref={ref} className="relative z-50 w-full max-w-sm mx-4 rounded-lg border border-border bg-background p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold mb-4">{title}</h3>
-        {children}
-      </div>
-    </div>,
-    document.body
-  );
-}
 
 function EditUserDialog({ open, user, onSave, onCancel }) {
   const [email, setEmail] = useState('');
@@ -91,17 +58,17 @@ function EditUserDialog({ open, user, onSave, onCancel }) {
           {user?.isSelf && <p className="text-xs text-muted-foreground mt-1">Cannot change your own role.</p>}
         </div>
       </div>
-      <div className="mt-4 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2">
         <button
           onClick={onCancel}
-          className="rounded-md px-3 py-1.5 text-sm font-medium border border-border bg-background hover:bg-muted"
+          className="rounded-md px-3 py-1.5 text-sm font-medium border border-border text-muted-foreground hover:text-foreground transition-colors"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
+          className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
@@ -151,17 +118,17 @@ function ResetPasswordDialog({ open, user, onSave, onCancel }) {
         className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground"
         onKeyDown={(e) => e.key === 'Enter' && handleSave()}
       />
-      <div className="mt-4 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2">
         <button
           onClick={onCancel}
-          className="rounded-md px-3 py-1.5 text-sm font-medium border border-border bg-background hover:bg-muted"
+          className="rounded-md px-3 py-1.5 text-sm font-medium border border-border text-muted-foreground hover:text-foreground transition-colors"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving || password.length < 8}
-          className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
+          className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
@@ -261,7 +228,7 @@ export function SettingsUsersPage() {
         {!showAddForm && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 shrink-0 transition-colors"
           >
             <PlusIcon size={14} />
             Add user
@@ -314,13 +281,13 @@ export function SettingsUsersPage() {
             <button
               onClick={handleCreate}
               disabled={!newEmail.trim() || !newPassword || newPassword.length < 8 || creating}
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
+              className="rounded-md px-2.5 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
             >
               {creating ? 'Creating...' : 'Create'}
             </button>
             <button
               onClick={() => { setShowAddForm(false); setNewEmail(''); setNewPassword(''); setError(null); }}
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground"
+              className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>
@@ -347,19 +314,19 @@ export function SettingsUsersPage() {
                 <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
                   <button
                     onClick={() => setEditingUser(u)}
-                    className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setResettingUser(u)}
-                    className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                   >
                     Reset password
                   </button>
                   <button
                     onClick={() => handleDelete(u.id)}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium border shrink-0 ${
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium border shrink-0 transition-colors ${
                       confirmDelete === u.id
                         ? 'border-destructive text-destructive hover:bg-destructive/10'
                         : 'border-border text-muted-foreground hover:text-destructive hover:border-destructive/50'
@@ -374,16 +341,11 @@ export function SettingsUsersPage() {
           </div>
         </div>
       ) : !showAddForm && (
-        <div className="rounded-lg border border-dashed bg-card p-8 flex flex-col items-center text-center">
-          <p className="text-sm text-muted-foreground mb-3">No users configured</p>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-foreground text-background hover:bg-foreground/90"
-          >
-            <PlusIcon size={14} />
-            Add user
-          </button>
-        </div>
+        <EmptyState
+          message="No users configured"
+          actionLabel="Add user"
+          onAction={() => setShowAddForm(true)}
+        />
       )}
 
       {/* Edit dialog */}

@@ -78,6 +78,10 @@ Files in managed directories are auto-synced (created, updated, **and deleted**)
 
 Exports defined in `package.json` `exports` field. Pattern: `thepopebot/{module}` maps to source files in `api/`, `lib/`, `config/`. Includes `./cluster/*`, `./voice/*` exports. Add new exports there when creating new importable modules.
 
+## UI Component Standards
+
+Settings/admin pages use shared components from `lib/chat/components/settings-shared.jsx`. See `lib/chat/components/CLAUDE.md` for the full UI standards (button tiers, dialogs, save feedback, delete confirmation, spacing, etc.). **Follow these standards when adding new settings pages.**
+
 ## Build System
 
 Run `npm run build` before publish. esbuild compiles `lib/chat/components/**/*.jsx`, `lib/auth/components/**/*.jsx`, `lib/code/*.jsx`, `lib/cluster/components/**/*.jsx` to ES modules.

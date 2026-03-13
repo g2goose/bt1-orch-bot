@@ -2,109 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { KeyIcon, CopyIcon, CheckIcon, TrashIcon, PlusIcon } from './icons.js';
+import { SecretRow, EmptyState, formatDate, timeAgo } from './settings-shared.js';
 import { createNewApiKey, getApiKeys, deleteApiKey, getApiKeySettings, updateApiKeySetting, regenerateWebhookSecret } from '../actions.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared
-// ─────────────────────────────────────────────────────────────────────────────
-
-function timeAgo(ts) {
-  if (!ts) return 'Never';
-  const seconds = Math.floor((Date.now() - ts) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
-
-function formatDate(ts) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function SecretRow({ label, isSet, onSave, onRegenerate, saving }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState('');
-
-  const handleSave = async () => {
-    await onSave(value);
-    setEditing(false);
-    setValue('');
-  };
-
-  if (editing) {
-    return (
-      <div className="flex flex-col gap-2 py-3">
-        <div className="flex items-center gap-2">
-          <KeyIcon size={14} className="text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="password"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Enter value..."
-            autoFocus
-            className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground"
-            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          />
-          <button
-            onClick={handleSave}
-            disabled={!value || saving}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
-          >
-            Save
-          </button>
-          <button
-            onClick={() => { setEditing(false); setValue(''); }}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3">
-      <div className="flex items-center gap-2">
-        <KeyIcon size={14} className="text-muted-foreground shrink-0" />
-        <span className="text-sm font-medium">{label}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className={`inline-flex items-center gap-1.5 text-xs ${isSet ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${isSet ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
-          {isSet ? 'Configured' : 'Not set'}
-        </span>
-        {onRegenerate && isSet && (
-          <button
-            onClick={onRegenerate}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            Regenerate
-          </button>
-        )}
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          {isSet ? 'Update' : 'Set'}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Keys sub-tab — Multiple named API keys
@@ -191,7 +90,7 @@ export function ApiKeysListPage() {
         {!showCreateForm && (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 shrink-0 transition-colors"
           >
             <PlusIcon size={14} />
             Create key
@@ -220,13 +119,13 @@ export function ApiKeysListPage() {
             <button
               onClick={handleCreate}
               disabled={!newKeyName.trim() || creating}
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
+              className="rounded-md px-2.5 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
             >
               {creating ? 'Creating...' : 'Create'}
             </button>
             <button
               onClick={() => { setShowCreateForm(false); setNewKeyName(''); }}
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground"
+              className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>
@@ -243,7 +142,7 @@ export function ApiKeysListPage() {
             </p>
             <button
               onClick={() => setNewKey(null)}
-              className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+              className="text-xs text-muted-foreground hover:text-foreground shrink-0 transition-colors"
             >
               Dismiss
             </button>
@@ -278,7 +177,7 @@ export function ApiKeysListPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(k.id)}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium border shrink-0 self-start sm:self-auto ${
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium border shrink-0 self-start sm:self-auto transition-colors ${
                     confirmDelete === k.id
                       ? 'border-destructive text-destructive hover:bg-destructive/10'
                       : 'border-border text-muted-foreground hover:text-destructive hover:border-destructive/50'
@@ -292,16 +191,11 @@ export function ApiKeysListPage() {
           </div>
         </div>
       ) : !showCreateForm && (
-        <div className="rounded-lg border border-dashed bg-card p-8 flex flex-col items-center text-center">
-          <p className="text-sm text-muted-foreground mb-3">No API keys configured</p>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-foreground text-background hover:bg-foreground/90"
-          >
-            <PlusIcon size={14} />
-            Create API key
-          </button>
-        </div>
+        <EmptyState
+          message="No API keys configured"
+          actionLabel="Create API key"
+          onAction={() => setShowCreateForm(true)}
+        />
       )}
     </div>
   );
@@ -330,7 +224,7 @@ function CopyButton({ text }) {
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
     >
       {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
       {copied ? 'Copied' : 'Copy'}
@@ -394,77 +288,6 @@ export function ApiKeysVoicePage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GitHub sub-tab — GH_TOKEN + GH_WEBHOOK_SECRET
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function ApiKeysGitHubPage() {
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const loadSettings = async () => {
-    try {
-      const result = await getApiKeySettings();
-      setSettings(result);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const getStatus = (key) => settings?.secrets?.find((s) => s.key === key)?.isSet || false;
-
-  const handleSave = async (key, value) => {
-    setSaving(true);
-    await updateApiKeySetting(key, value);
-    await loadSettings();
-    setSaving(false);
-  };
-
-  const handleRegenerate = async (key) => {
-    setSaving(true);
-    await regenerateWebhookSecret(key);
-    await loadSettings();
-    setSaving(false);
-  };
-
-  if (loading) {
-    return <div className="h-24 animate-pulse rounded-md bg-border/50" />;
-  }
-
-  return (
-    <div>
-      <div className="mb-4">
-        <h2 className="text-base font-medium">GitHub</h2>
-        <p className="text-sm text-muted-foreground">Credentials used by the event handler for GitHub operations (branches, PRs, webhooks).</p>
-      </div>
-      <div className="rounded-lg border bg-card p-4">
-        <div className="divide-y divide-border">
-          <SecretRow
-            label="Personal Access Token"
-            isSet={getStatus('GH_TOKEN')}
-            saving={saving}
-            onSave={(val) => handleSave('GH_TOKEN', val)}
-          />
-          <SecretRow
-            label="Webhook Secret"
-            isSet={getStatus('GH_WEBHOOK_SECRET')}
-            saving={saving}
-            onSave={(val) => handleSave('GH_WEBHOOK_SECRET', val)}
-            onRegenerate={() => handleRegenerate('GH_WEBHOOK_SECRET')}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Telegram sub-tab — Bot Token + Webhook Secret + Chat ID
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -514,7 +337,7 @@ export function ApiKeysTelegramPage() {
   };
 
   if (loading) {
-    return <div className="h-32 animate-pulse rounded-md bg-border/50" />;
+    return <div className="h-24 animate-pulse rounded-md bg-border/50" />;
   }
 
   return (
@@ -553,7 +376,7 @@ export function ApiKeysTelegramPage() {
             <button
               onClick={handleSaveChatId}
               disabled={savingChatId}
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+              className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 transition-colors"
             >
               {savingChatId ? 'Saving...' : 'Save'}
             </button>
@@ -568,3 +391,5 @@ export function ApiKeysTelegramPage() {
 export function SettingsSecretsPage() {
   return <ApiKeysListPage />;
 }
+
+// ApiKeysGitHubPage removed — GitHub credentials now live on the GitHub > Tokens tab

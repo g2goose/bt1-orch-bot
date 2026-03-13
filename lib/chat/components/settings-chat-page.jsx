@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { KeyIcon, CheckIcon, PlusIcon, TrashIcon } from './icons.js';
+import { SecretRow, StatusBadge, Dialog } from './settings-shared.js';
 import {
   getChatSettings,
   updateProviderCredential,
@@ -10,84 +11,6 @@ import {
   removeCustomProvider,
   setActiveLlm,
 } from '../actions.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared components
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StatusBadge({ isSet }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs ${isSet ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${isSet ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
-      {isSet ? 'Configured' : 'Not set'}
-    </span>
-  );
-}
-
-function SecretRow({ label, description, isSet, onSave, saving }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState('');
-
-  const handleSave = async () => {
-    await onSave(value);
-    setEditing(false);
-    setValue('');
-  };
-
-  if (editing) {
-    return (
-      <div className="flex flex-col gap-2 py-3">
-        <div className="flex items-center gap-2">
-          <KeyIcon size={14} className="text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="password"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Enter value..."
-            autoFocus
-            className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground"
-            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          />
-          <button
-            onClick={handleSave}
-            disabled={!value || saving}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            onClick={() => { setEditing(false); setValue(''); }}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3">
-      <div className="flex items-center gap-2">
-        <KeyIcon size={14} className="text-muted-foreground shrink-0" />
-        <span className="text-sm font-medium">{label}</span>
-        {description && <span className="text-xs text-muted-foreground hidden sm:inline">— {description}</span>}
-      </div>
-      <div className="flex items-center gap-3">
-        <StatusBadge isSet={isSet} />
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          {isSet ? 'Update' : 'Set'}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration sub-tab (auto-save)
@@ -364,7 +287,7 @@ export function ChatProvidersPage() {
   };
 
   if (loading) {
-    return <div className="h-64 animate-pulse rounded-md bg-border/50" />;
+    return <div className="h-48 animate-pulse rounded-md bg-border/50" />;
   }
 
   if (settings?.error) {
@@ -499,13 +422,13 @@ function CustomProviderCard({ provider, onEdit, onRemove }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => onEdit(provider)}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           >
             Edit
           </button>
           <button
             onClick={handleRemove}
-            className={`rounded-md px-2.5 py-1.5 text-xs font-medium border ${
+            className={`rounded-md px-2.5 py-1.5 text-xs font-medium border transition-colors ${
               confirmRemove
                 ? 'border-destructive text-destructive hover:bg-destructive/10'
                 : 'border-border text-muted-foreground hover:text-destructive hover:border-destructive/50'
@@ -564,17 +487,6 @@ function CustomProviderDialog({ open, initial, onSave, onCancel }) {
     }
   }, [open, initial]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onCancel]);
-
-  if (!open) return null;
-
   const handleSubmit = async () => {
     setSaving(true);
     const config = { name, baseUrl, model };
@@ -585,41 +497,37 @@ function CustomProviderDialog({ open, initial, onSave, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative z-50 w-full max-w-md mx-4 rounded-lg border border-border bg-background p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold mb-4">{initial ? 'Edit Provider' : 'Add Custom Provider'}</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium mb-1 block">Name</label>
-            <input ref={nameRef} type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Together AI"
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
-          </div>
-          <div>
-            <label className="text-xs font-medium mb-1 block">Base URL</label>
-            <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.together.xyz/v1"
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
-          </div>
-          <div>
-            <label className="text-xs font-medium mb-1 block">API Key <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={initial?.hasApiKey ? '••••••••' : 'sk-...'}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
-          </div>
-          <div>
-            <label className="text-xs font-medium mb-1 block">Model</label>
-            <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="meta-llama/Llama-3-70b-chat"
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
-          </div>
+    <Dialog open={open} onClose={onCancel} title={initial ? 'Edit Provider' : 'Add Custom Provider'}>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium mb-1 block">Name</label>
+          <input ref={nameRef} type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Together AI"
+            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onCancel} className="rounded-md px-3 py-1.5 text-sm font-medium border border-border text-muted-foreground hover:text-foreground">Cancel</button>
-          <button onClick={handleSubmit} disabled={!name || !baseUrl || saving}
-            className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50">
-            {saving ? 'Saving...' : initial ? 'Save' : 'Add'}
-          </button>
+        <div>
+          <label className="text-xs font-medium mb-1 block">Base URL</label>
+          <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.together.xyz/v1"
+            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
+        </div>
+        <div>
+          <label className="text-xs font-medium mb-1 block">API Key <span className="text-muted-foreground font-normal">(optional)</span></label>
+          <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={initial?.hasApiKey ? '••••••••' : 'sk-...'}
+            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
+        </div>
+        <div>
+          <label className="text-xs font-medium mb-1 block">Model</label>
+          <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="meta-llama/Llama-3-70b-chat"
+            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground" />
         </div>
       </div>
-    </div>
+      <div className="flex justify-end gap-2 mt-5">
+        <button onClick={onCancel} className="rounded-md px-3 py-1.5 text-sm font-medium border border-border text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+        <button onClick={handleSubmit} disabled={!name || !baseUrl || saving}
+          className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors">
+          {saving ? 'Saving...' : initial ? 'Save' : 'Add'}
+        </button>
+      </div>
+    </Dialog>
   );
 }
 
@@ -686,7 +594,7 @@ export function ChatLlmPage() {
   const closeDialog = () => { setShowDialog(false); setEditingProvider(null); };
 
   if (loading) {
-    return <div className="h-64 animate-pulse rounded-md bg-border/50" />;
+    return <div className="h-48 animate-pulse rounded-md bg-border/50" />;
   }
 
   if (settings?.error) {
@@ -694,7 +602,7 @@ export function ChatLlmPage() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* Default Provider section */}
       <div>
         <div className="mb-4">

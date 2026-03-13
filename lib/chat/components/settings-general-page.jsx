@@ -40,12 +40,9 @@ export function SettingsGeneralPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="h-6 w-48 bg-muted animate-pulse rounded" />
-        <div className="rounded-lg border bg-card p-4">
-          <div className="h-4 w-64 bg-muted animate-pulse rounded mb-3" />
-          <div className="h-4 w-96 bg-muted animate-pulse rounded" />
-        </div>
+      <div className="space-y-3">
+        <div className="h-16 animate-pulse rounded-md bg-border/50" />
+        <div className="h-16 animate-pulse rounded-md bg-border/50" />
       </div>
     );
   }
@@ -54,10 +51,12 @@ export function SettingsGeneralPage() {
     <div className="space-y-6">
       {/* Auto Upgrade */}
       <div>
-        <h2 className="text-lg font-medium mb-1">Auto Upgrade</h2>
-        <p className="text-sm text-muted-foreground mb-4">
+        <div className="mb-4">
+          <h2 className="text-base font-medium">Auto Upgrade</h2>
+          <p className="text-sm text-muted-foreground">
           Configure how the system checks for new versions.
-        </p>
+          </p>
+        </div>
 
         <div className="rounded-lg border bg-card p-4">
           <label className="flex items-start gap-3 cursor-pointer">
