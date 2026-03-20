@@ -3,7 +3,7 @@
 ## Architecture
 
 Two axes, both selected at runtime:
-- **`RUNTIME`** — the workflow (job, headless, workspace, cluster-worker)
+- **`RUNTIME`** — the workflow (job, headless, interactive, cluster-worker)
 - **`AGENT`** — the coding agent (claude-code, pi, gemini, etc.)
 
 Base image (`Dockerfile`) has everything shared. Per-agent images extend it:
@@ -21,12 +21,11 @@ coding-agent-base               →  Ubuntu 24.04, Node.js 22, GitHub CLI, ttyd,
 
 ```
 headless/1_setup-git.sh       → source common/setup-git.sh      (shared)
-headless/2_clone-or-reset.sh  → source common/clone-or-reset.sh (shared)
+headless/2_clone.sh  → source common/clone.sh (shared)
 headless/3_feature-branch.sh  → source common/feature-branch.sh (shared)
 headless/4_agent-auth.sh      → source agents/${AGENT}/auth.sh  (agent-specific)
 headless/5_agent-setup.sh     → source agents/${AGENT}/setup.sh (agent-specific)
 headless/6_agent-run.sh       → source agents/${AGENT}/run.sh   (agent-specific)
-headless/7_rebase-push.sh     → source common/rebase-push.sh    (shared)
 ```
 
 ## Env Vars
@@ -35,7 +34,7 @@ headless/7_rebase-push.sh     → source common/rebase-push.sh    (shared)
 
 | Variable | Values | Purpose |
 |----------|--------|---------|
-| `RUNTIME` | `job`, `headless`, `workspace`, `cluster-worker` | Selects workflow script folder |
+| `RUNTIME` | `job`, `headless`, `interactive`, `cluster-worker` | Selects workflow script folder |
 | `AGENT` | `claude-code`, `pi`, `gemini` | Set by per-agent Dockerfile (not passed at runtime) |
 
 ### Git / Repo
@@ -43,10 +42,10 @@ headless/7_rebase-push.sh     → source common/rebase-push.sh    (shared)
 | Variable | Used by | Purpose |
 |----------|---------|---------|
 | `GH_TOKEN` | all | GitHub CLI auth |
-| `REPO` | headless, workspace | GitHub `owner/repo` slug |
+| `REPO` | headless, interactive | GitHub `owner/repo` slug |
 | `REPO_URL` | job | Full git clone URL (includes token) |
-| `BRANCH` | job, headless, workspace | Base branch (default: main) |
-| `FEATURE_BRANCH` | headless, workspace | Feature branch to create/checkout. If empty, skips branching and pushing. |
+| `BRANCH` | job, headless, interactive | Base branch (default: main) |
+| `FEATURE_BRANCH` | headless, interactive | Feature branch to create/checkout. If empty, skips branching and pushing. |
 
 ### Agent Task
 
@@ -84,7 +83,7 @@ Pass whichever key(s) your agent/provider needs:
 | `SECRETS` | JSON blob of AGENT_* secrets (from GitHub Actions) |
 | `LLM_SECRETS` | JSON blob of AGENT_LLM_* secrets (from GitHub Actions) |
 
-### Workspace Runtime
+### Interactive Runtime
 
 | Variable | Purpose |
 |----------|---------|
@@ -177,7 +176,7 @@ Each agent has these scripts in `scripts/agents/<agent>/`:
 | `setup.sh` | Configure the agent. Claude Code: trust config + Playwright MCP. Pi: write SYSTEM.md + generate models.json. |
 | `run.sh` | Invoke the agent headlessly. Sets `AGENT_EXIT` for downstream scripts. |
 | `merge-back.sh` | AI-driven conflict resolution when rebase fails. |
-| `interactive.sh` | Start agent in tmux + ttyd (workspace runtime only). |
+| `interactive.sh` | Start agent in tmux + ttyd (interactive runtime only). |
 
 ## Common Scripts
 
@@ -186,9 +185,9 @@ Shared workflow logic in `scripts/common/`:
 | Script | Purpose |
 |--------|---------|
 | `setup-git.sh` | Derive git identity from `GH_TOKEN` via GitHub API |
-| `clone-or-reset.sh` | Clone repo or fetch+reset if already present |
-| `feature-branch.sh` | Create/checkout feature branch. Skips if `FEATURE_BRANCH` is empty. |
-| `rebase-push.sh` | Commit, rebase onto base branch, push. Skips if `FEATURE_BRANCH` is empty. Falls back to agent merge-back on conflict. |
+| `clone.sh` | Clone repo if workspace is empty, otherwise skip (respects persisted volume state) |
+| `feature-branch.sh` | Create/checkout feature branch on fresh clone. Skips if `FEATURE_BRANCH` is empty or branch already exists. |
+| `rebase-push.sh` | Commit, rebase onto base branch, push. Used by job runtime only. |
 
 ## Volume Mounts
 

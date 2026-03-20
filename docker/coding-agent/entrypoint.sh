@@ -11,7 +11,7 @@ set -e
 #
 # ── REQUIRED ─────────────────────────────────────────────────────────
 #
-#   RUNTIME             job | headless | workspace | cluster-worker
+#   RUNTIME             job | headless | interactive | cluster-worker
 #                       Selects the script folder: /scripts/${RUNTIME}/
 #
 #   AGENT               claude-code | pi | gemini | codex | opencode
@@ -20,10 +20,10 @@ set -e
 # ── GIT / REPO ───────────────────────────────────────────────────────
 #
 #   GH_TOKEN            GitHub personal access token (used by all runtimes)
-#   REPO                GitHub owner/repo slug (headless, workspace)
+#   REPO                GitHub owner/repo slug (headless, interactive)
 #   REPO_URL            Full git clone URL (job — includes token in URL)
 #   BRANCH              Base branch to clone/checkout (default: main)
-#   FEATURE_BRANCH      Feature branch to create or checkout (headless, workspace)
+#   FEATURE_BRANCH      Feature branch to create or checkout (headless, interactive)
 #
 # ── AGENT ────────────────────────────────────────────────────────────
 #
@@ -58,7 +58,7 @@ set -e
 #   SECRETS             JSON blob of AGENT_* secrets (from GitHub Actions)
 #   LLM_SECRETS         JSON blob of AGENT_LLM_* secrets (from GitHub Actions)
 #
-# ── WORKSPACE RUNTIME ────────────────────────────────────────────────
+# ── INTERACTIVE RUNTIME ──────────────────────────────────────────────
 #
 #   CHAT_CONTEXT        JSON planning conversation for SessionStart hook
 #   PORT                ttyd port (default: 7681)
@@ -70,7 +70,7 @@ set -e
 # ══════════════════════════════════════════════════════════════════════
 
 if [ -z "$RUNTIME" ]; then
-    echo "ERROR: RUNTIME env var is required (job, headless, workspace, cluster-worker)"
+    echo "ERROR: RUNTIME env var is required (job, headless, interactive, cluster-worker)"
     exit 1
 fi
 

@@ -46,17 +46,17 @@ Port the existing `claude-code-job` + `pi-coding-agent-job` entrypoints into the
 - [ ] Test: job + claude-code
 - [ ] Test: job + pi
 
-### workspace/
+### interactive/
 
-- [ ] `workspace/1_setup-git.sh` — source common/setup-git.sh
-- [ ] `workspace/2_clone-or-reset.sh` — source common/clone-or-reset.sh
-- [ ] `workspace/3_feature-branch.sh` — source common/feature-branch.sh
-- [ ] `workspace/4_agent-auth.sh` — source agents/${AGENT}/auth.sh
-- [ ] `workspace/5_agent-setup.sh` — source agents/${AGENT}/setup.sh (extends with SessionStart hook for chat context)
-- [ ] `workspace/6_chat-context.sh` — write CHAT_CONTEXT to .claude/chat-context.txt
-- [ ] `workspace/7_start-interactive.sh` — source agents/${AGENT}/interactive.sh
-- [ ] Test: workspace + claude-code
-- [ ] Test: workspace + pi
+- [x] `interactive/1_setup-git.sh` — source common/setup-git.sh
+- [x] `interactive/2_clone-or-reset.sh` — source common/clone-or-reset.sh
+- [x] `interactive/3_feature-branch.sh` — source common/feature-branch.sh
+- [x] `interactive/4_agent-auth.sh` — source agents/${AGENT}/auth.sh
+- [x] `interactive/5_agent-setup.sh` — source agents/${AGENT}/setup.sh
+- [x] `interactive/6_chat-context.sh` — write CHAT_CONTEXT to .claude/chat-context.txt + SessionStart hook
+- [x] `interactive/7_start-interactive.sh` — source agents/${AGENT}/interactive.sh
+- [ ] Test: interactive + claude-code
+- [ ] Test: interactive + pi
 
 ### cluster-worker/
 
@@ -94,10 +94,10 @@ Not all runtime × agent combinations need testing, but the key ones do:
 |---------|:-----------:|:--:|:------:|:-----:|:--------:|
 | **headless** | ✅ tested | ✅ tested | untested | untested | untested |
 | **job** | not built | not built | — | — | — |
-| **workspace** | not built | not built | — | — | — |
+| **interactive** | built | built | — | — | — |
 | **cluster-worker** | not built | not built | — | — | — |
 
-Priority testing: headless for gemini/codex/opencode, then job + workspace + cluster-worker for claude-code and pi.
+Priority testing: headless for gemini/codex/opencode, then job + interactive + cluster-worker for claude-code and pi.
 
 ---
 
