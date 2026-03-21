@@ -11,7 +11,7 @@ Two agent types, both using `createReactAgent` from `@langchain/langgraph/prebui
 
 **Code Agent** — per-workspace via `getCodeAgent({ repo, branch, workspaceId, chatId })`:
 - System prompt: `config/CODE_PLANNING.md` (rendered fresh each invocation)
-- Tools: `start_coding` (bound to workspace), `get_repository_details` (bound to repo/branch), + web search
+- Tools: `start_coding` (bound to workspace), + web search
 - Keyed by `repo_branch_workspaceId` in an internal Map
 
 ## Adding a New Tool
