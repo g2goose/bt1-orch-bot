@@ -9,7 +9,7 @@ import { ChatHeader } from './chat-header.js';
 import { Greeting } from './greeting.js';
 import { CodeModeToggle } from './code-mode-toggle.js';
 import { DiffViewer } from './diff-viewer.js';
-import { getRepositories, getBranches } from '../actions.js';
+import { getRepositories, getBranches, updateWorkspaceBranch } from '../actions.js';
 
 export function Chat({ chatId, initialMessages = [], workspace = null }) {
   const [input, setInput] = useState('');
@@ -209,7 +209,12 @@ export function Chat({ chatId, initialMessages = [], workspace = null }) {
       repo={repo}
       onRepoChange={setRepo}
       branch={branch}
-      onBranchChange={setBranch}
+      onBranchChange={(newBranch) => {
+        setBranch(newBranch);
+        if (workspaceState?.id) {
+          updateWorkspaceBranch(workspaceState.id, newBranch);
+        }
+      }}
       locked={messages.length > 0}
       getRepositories={getRepositories}
       getBranches={getBranches}

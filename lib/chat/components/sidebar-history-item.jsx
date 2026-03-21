@@ -40,7 +40,12 @@ export function SidebarHistoryItem({ chat, isActive, onDelete, onStar, onRename 
             setOpenMobile(false);
           }}
         >
-          {chat.codeWorkspaceId ? <CodeIcon size={14} /> : <MessageIcon size={14} />}
+          {chat.codeWorkspaceId ? (
+            <span className="relative">
+              <CodeIcon size={14} />
+              {chat.hasChanges ? <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-yellow-500" /> : null}
+            </span>
+          ) : <MessageIcon size={14} />}
           <span className="truncate flex-1">
             {chat.title}
           </span>

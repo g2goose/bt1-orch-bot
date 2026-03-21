@@ -9,10 +9,10 @@ import { cn } from '../utils.js';
 import { useFeatures } from './features-context.js';
 
 const COMMAND_LABELS = {
-  'commit': 'Commit',
-  'push': 'Push',
+  'commit': 'Commit Branch',
+  'push': 'Push Branch',
   'create-pr': 'Create PR',
-  'rebase': 'Rebase',
+  'rebase': 'Rebase Branch',
   'resolve-conflicts': 'Resolve Conflicts',
 };
 
@@ -128,13 +128,33 @@ export function CodeModeToggle({
 
     return (
       <div className="flex items-center gap-2 text-xs min-w-0 px-1 py-0.5">
-        <div className="flex items-center gap-1.5 text-muted-foreground min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1.5 text-muted-foreground min-w-0">
           <GitBranchIcon size={12} className="shrink-0" />
           {repoName && <span className="shrink-0 cursor-default" title={repo}>{repoName}</span>}
           {branch && (
             <>
               <span className="shrink-0 text-muted-foreground/30">/</span>
-              <span className="shrink-0 font-medium text-foreground cursor-default" title={branch}>{branch}</span>
+              <div className="shrink-0 max-w-[120px]">
+                <Combobox
+                  options={branches.map((b) => ({ value: b.name, label: b.name }))}
+                  value={branch}
+                  onChange={onBranchChange}
+                  loading={loadingBranches}
+                  side="top"
+                  onOpen={() => {
+                    if (!loadingBranches && repo) {
+                      setLoadingBranches(true);
+                      getBranches(repo).then((data) => {
+                        setBranches(data || []);
+                      }).catch(() => {
+                        setBranches([]);
+                      }).finally(() => setLoadingBranches(false));
+                    }
+                  }}
+                  triggerClassName="font-medium text-foreground hover:text-primary transition-colors cursor-pointer truncate text-xs"
+                  triggerLabel={<span className="truncate" title={branch}>{branch}</span>}
+                />
+              </div>
             </>
           )}
           {featureBranch && (
