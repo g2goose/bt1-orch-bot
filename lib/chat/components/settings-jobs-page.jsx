@@ -38,6 +38,148 @@ function buildProviderOptions() {
 const PROVIDER_OPTIONS = buildProviderOptions();
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Searchable provider combobox
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProviderCombobox({ value, onChange, inputClass }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const wrapperRef = useRef(null);
+  const listRef = useRef(null);
+
+  const selected = PROVIDER_OPTIONS.find((o) => o.id === value);
+
+  const filtered = query
+    ? PROVIDER_OPTIONS.filter((o) =>
+        o.label.toLowerCase().includes(query.toLowerCase())
+      )
+    : PROVIDER_OPTIONS;
+
+  // Reset highlight when filtered list changes
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [query]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (open && listRef.current) {
+      const item = listRef.current.children[highlightIndex];
+      if (item) item.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightIndex, open]);
+
+  const handleSelect = (option) => {
+    onChange(option.id);
+    setQuery('');
+    setOpen(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setOpen(true);
+      return;
+    }
+    if (!open) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filtered[highlightIndex]) handleSelect(filtered[highlightIndex]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  // Group filtered options by provider
+  const grouped = {};
+  for (const opt of filtered) {
+    if (!grouped[opt.providerName]) grouped[opt.providerName] = [];
+    grouped[opt.providerName].push(opt);
+  }
+
+  let flatIndex = -1;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="text-xs font-medium mb-1 block">Provider</label>
+      <input
+        type="text"
+        value={open ? query : (selected ? selected.label : '')}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          if (!open) setOpen(true);
+        }}
+        onFocus={() => {
+          setOpen(true);
+          setQuery('');
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder="Search providers..."
+        className={`${inputClass} font-sans`}
+      />
+      {open && filtered.length > 0 && (
+        <div
+          ref={listRef}
+          className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-background shadow-lg"
+        >
+          {Object.entries(grouped).map(([providerName, options]) => (
+            <div key={providerName}>
+              <div className="px-3 py-1 text-xs font-medium text-muted-foreground sticky top-0 bg-background border-b border-border">
+                {providerName}
+              </div>
+              {options.map((opt) => {
+                flatIndex++;
+                const idx = flatIndex;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelect(opt)}
+                    onMouseEnter={() => setHighlightIndex(idx)}
+                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                      idx === highlightIndex
+                        ? 'bg-accent text-foreground'
+                        : value === opt.id
+                          ? 'text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {opt.packageName}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      {open && filtered.length === 0 && query && (
+        <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg px-3 py-2 text-sm text-muted-foreground">
+          No providers found
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Unified add secret dialog (manual + OAuth modes)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -294,25 +436,11 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
             {/* OAuth mode fields */}
             {mode === 'oauth' && (
               <>
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Provider</label>
-                  <select
-                    value={selectedOption}
-                    onChange={(e) => setSelectedOption(e.target.value)}
-                    className={`${inputClass} font-sans`}
-                  >
-                    <option value="">Select a provider...</option>
-                    {Object.entries(OAUTH_PROVIDERS).map(([providerId, provider]) => (
-                      <optgroup key={providerId} label={provider.name}>
-                        {Object.entries(provider.packages).map(([packageId, pkg]) => (
-                          <option key={`${providerId}:${packageId}`} value={`${providerId}:${packageId}`}>
-                            {pkg.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
+                <ProviderCombobox
+                  value={selectedOption}
+                  onChange={setSelectedOption}
+                  inputClass={inputClass}
+                />
                 <div>
                   <label className="text-xs font-medium mb-1 block">Client ID</label>
                   <input
