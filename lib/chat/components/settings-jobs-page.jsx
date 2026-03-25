@@ -1,13 +1,42 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { PlusIcon } from './icons.js';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { PlusIcon, KeyIcon, CopyIcon, CheckIcon, SpinnerIcon } from './icons.js';
 import { SecretRow, Dialog, EmptyState } from './settings-shared.js';
+import { OAUTH_PROVIDERS } from '../../oauth/providers.js';
 import {
   getAgentJobSecrets,
   updateAgentJobSecret,
   deleteAgentJobSecretAction,
+  getOAuthRedirectUri,
+  initiateOAuthFlow,
 } from '../actions.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Build flat list of provider/package options for the dropdown
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildProviderOptions() {
+  const options = [];
+  for (const [providerId, provider] of Object.entries(OAUTH_PROVIDERS)) {
+    for (const [packageId, pkg] of Object.entries(provider.packages)) {
+      options.push({
+        id: `${providerId}:${packageId}`,
+        providerId,
+        packageId,
+        providerName: provider.name,
+        packageName: pkg.name,
+        label: `${provider.name} > ${pkg.name}`,
+        scopes: pkg.scopes,
+        authorizeUrl: provider.authorizeUrl,
+        tokenUrl: provider.tokenUrl,
+      });
+    }
+  }
+  return options;
+}
+
+const PROVIDER_OPTIONS = buildProviderOptions();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Add secret dialog
@@ -105,6 +134,245 @@ function AddJobSecretDialog({ open, onAdd, onCancel }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OAuth helper dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AddOAuthSecretDialog({ open, onCancel, onSuccess }) {
+  const [name, setName] = useState('');
+  const [selectedOption, setSelectedOption] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [scopes, setScopes] = useState('');
+  const [redirectUri, setRedirectUri] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('form'); // form | waiting | success
+  const nameRef = useRef(null);
+  const popupRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  // Load redirect URI on open
+  useEffect(() => {
+    if (open) {
+      setName('');
+      setSelectedOption('');
+      setClientId('');
+      setClientSecret('');
+      setScopes('');
+      setError(null);
+      setStatus('form');
+      setCopied(false);
+      getOAuthRedirectUri().then(setRedirectUri).catch(() => {});
+      setTimeout(() => nameRef.current?.focus(), 50);
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [open]);
+
+  // Update scopes when provider/package selection changes
+  useEffect(() => {
+    if (selectedOption) {
+      const opt = PROVIDER_OPTIONS.find((o) => o.id === selectedOption);
+      if (opt) setScopes(opt.scopes);
+    }
+  }, [selectedOption]);
+
+  // Listen for postMessage from the OAuth callback popup
+  const handleMessage = useCallback((event) => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data;
+    if (data?.type === 'oauth-success') {
+      setStatus('success');
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      onSuccess();
+      setTimeout(() => onCancel(), 1500);
+    } else if (data?.type === 'oauth-error') {
+      setStatus('form');
+      setError(data.detail || 'Authorization failed.');
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    }
+  }, [onCancel, onSuccess]);
+
+  useEffect(() => {
+    if (status === 'waiting') {
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
+  }, [status, handleMessage]);
+
+  const handleCopyRedirectUri = () => {
+    navigator.clipboard.writeText(redirectUri);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAuthorize = async () => {
+    const trimmedName = name.trim().toUpperCase();
+    if (!trimmedName || !selectedOption || !clientId || !clientSecret) return;
+
+    setError(null);
+    const opt = PROVIDER_OPTIONS.find((o) => o.id === selectedOption);
+    if (!opt) return;
+
+    const result = await initiateOAuthFlow({
+      secretName: trimmedName,
+      clientId,
+      clientSecret,
+      tokenUrl: opt.tokenUrl,
+      scopes,
+      secretType: 'agent_job_secret',
+      returnPath: '/admin/event-handler/jobs',
+    });
+
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+
+    // Build the authorize URL
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: result.redirectUri,
+      scope: scopes,
+      state: result.state,
+      access_type: 'offline',
+      prompt: 'consent',
+    });
+    const authorizeUrl = `${opt.authorizeUrl}?${params.toString()}`;
+
+    // Open popup
+    popupRef.current = window.open(authorizeUrl, 'oauth-popup', 'width=600,height=700');
+    setStatus('waiting');
+
+    // Timeout after 5 minutes
+    timeoutRef.current = setTimeout(() => {
+      if (status === 'waiting') {
+        setStatus('form');
+        setError('Authorization timed out. Please try again.');
+      }
+    }, 5 * 60 * 1000);
+  };
+
+  const inputClass = 'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground';
+
+  return (
+    <Dialog open={open} onClose={onCancel} title="OAuth Helper">
+      {status === 'success' ? (
+        <div className="flex items-center justify-center gap-2 py-8 text-green-500">
+          <CheckIcon size={20} />
+          <span className="text-sm font-medium">Token saved!</span>
+        </div>
+      ) : status === 'waiting' ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-8">
+          <SpinnerIcon size={20} className="animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Waiting for authorization...</p>
+          <p className="text-xs text-muted-foreground">Complete the login in the popup window.</p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block">Secret Name</label>
+              <input
+                ref={nameRef}
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
+                placeholder="e.g. GOOGLE_OAUTH_TOKEN"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Provider</label>
+              <select
+                value={selectedOption}
+                onChange={(e) => setSelectedOption(e.target.value)}
+                className={`${inputClass} font-sans`}
+              >
+                <option value="">Select a provider...</option>
+                {Object.entries(OAUTH_PROVIDERS).map(([providerId, provider]) => (
+                  <optgroup key={providerId} label={provider.name}>
+                    {Object.entries(provider.packages).map(([packageId, pkg]) => (
+                      <option key={`${providerId}:${packageId}`} value={`${providerId}:${packageId}`}>
+                        {pkg.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Client ID</label>
+              <input
+                type="text"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                placeholder="OAuth client ID"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Client Secret</label>
+              <input
+                type="password"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                placeholder="OAuth client secret"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Scopes</label>
+              <input
+                type="text"
+                value={scopes}
+                onChange={(e) => setScopes(e.target.value)}
+                placeholder="Space-separated scopes"
+                className={inputClass}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Prefilled from the selected package. Edit if needed.</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Redirect URI</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={redirectUri}
+                  readOnly
+                  className={`${inputClass} text-muted-foreground bg-muted flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyRedirectUri}
+                  className="rounded-md px-2.5 py-1.5 text-xs border border-border text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  title="Copy redirect URI"
+                >
+                  {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Add this URL as a redirect URI in your OAuth app.</p>
+            </div>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+          <div className="flex justify-end gap-2 mt-5">
+            <button onClick={onCancel} className="rounded-md px-3 py-1.5 text-sm font-medium border border-border text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+            <button
+              onClick={handleAuthorize}
+              disabled={!name.trim() || !selectedOption || !clientId || !clientSecret}
+              className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
+            >
+              Authorize
+            </button>
+          </div>
+        </>
+      )}
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Jobs page
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -112,6 +380,7 @@ export function JobsPage() {
   const [secrets, setSecrets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showOAuth, setShowOAuth] = useState(false);
 
   const loadSecrets = async () => {
     try {
@@ -157,18 +426,32 @@ export function JobsPage() {
           <h2 className="text-base font-medium">Job Secrets</h2>
           <p className="text-sm text-muted-foreground">Custom environment variables passed to agent job containers. These are merged with built-in auth credentials when launching jobs.</p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 shrink-0 transition-colors"
-        >
-          <PlusIcon size={14} />
-          Add secret
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowOAuth(true)}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-accent shrink-0 transition-colors"
+          >
+            <KeyIcon size={14} />
+            OAuth helper
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 shrink-0 transition-colors"
+          >
+            <PlusIcon size={14} />
+            Add secret
+          </button>
+        </div>
       </div>
       <AddJobSecretDialog
         open={showAdd}
         onAdd={handleAdd}
         onCancel={() => setShowAdd(false)}
+      />
+      <AddOAuthSecretDialog
+        open={showOAuth}
+        onCancel={() => setShowOAuth(false)}
+        onSuccess={loadSecrets}
       />
       {secrets.length === 0 ? (
         <EmptyState

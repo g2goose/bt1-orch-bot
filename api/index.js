@@ -8,6 +8,8 @@ import { createNotification } from '../lib/db/notifications.js';
 import { loadTriggers } from '../lib/triggers.js';
 import { verifyApiKey } from '../lib/db/api-keys.js';
 import { getConfig } from '../lib/config.js';
+import { parseOAuthState, exchangeCodeForToken } from '../lib/oauth/helper.js';
+import { setAgentJobSecret } from '../lib/db/config.js';
 
 // Bot token — resolved from DB/env, can be overridden by /telegram/register
 let telegramBotToken = null;
@@ -31,7 +33,7 @@ function getFireTriggers() {
 }
 
 // Routes that have their own authentication
-const PUBLIC_ROUTES = ['/telegram/webhook', '/github/webhook', '/ping'];
+const PUBLIC_ROUTES = ['/telegram/webhook', '/github/webhook', '/ping', '/oauth/callback'];
 
 /**
  * Timing-safe string comparison.
@@ -219,6 +221,65 @@ async function handleAgentJobStatus(request) {
   }
 }
 
+async function handleOAuthCallback(request) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code');
+  const stateParam = url.searchParams.get('state');
+  const error = url.searchParams.get('error');
+
+  if (error) {
+    const desc = url.searchParams.get('error_description') || error;
+    return oauthResultPage(false, desc);
+  }
+
+  if (!code || !stateParam) {
+    return oauthResultPage(false, 'Missing code or state parameter.');
+  }
+
+  try {
+    const state = parseOAuthState(stateParam);
+    const redirectUri = `${process.env.NEXTAUTH_URL || process.env.BASE_URL}/api/oauth/callback`;
+
+    const tokenData = await exchangeCodeForToken({
+      code,
+      clientId: state.clientId,
+      clientSecret: state.clientSecret,
+      tokenUrl: state.tokenUrl,
+      redirectUri,
+    });
+
+    // Save the full token JSON as the secret value
+    const tokenJson = JSON.stringify(tokenData);
+    setAgentJobSecret(state.secretName, tokenJson, 'oauth');
+
+    return oauthResultPage(true, state.secretName);
+  } catch (err) {
+    console.error('OAuth callback error:', err);
+    return oauthResultPage(false, err.message || 'Token exchange failed.');
+  }
+}
+
+function oauthResultPage(success, detail) {
+  const safe = String(detail).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const messagePayload = JSON.stringify({ type: success ? 'oauth-success' : 'oauth-error', detail: safe });
+  const fallback = success
+    ? `Token saved as <strong>${safe}</strong>. You can close this tab and return to settings.`
+    : `Error: ${safe}`;
+
+  const html = `<!DOCTYPE html><html><head><title>OAuth ${success ? 'Success' : 'Error'}</title></head><body>
+<script>
+  if (window.opener) {
+    window.opener.postMessage(${messagePayload}, window.location.origin);
+    window.close();
+  } else {
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:2rem;">${fallback.replace(/'/g, "\\'")}</p>';
+  }
+</script>
+<noscript><p style="font-family:sans-serif;padding:2rem;">${fallback}</p></noscript>
+</body></html>`;
+  return new Response(html, { status: success ? 200 : 400, headers: { 'Content-Type': 'text/html' } });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Next.js Route Handlers (catch-all)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -270,9 +331,10 @@ async function GET(request) {
   if (authError) return authError;
 
   switch (routePath) {
-    case '/ping':           return Response.json({ message: 'Pong!' });
+    case '/ping':               return Response.json({ message: 'Pong!' });
     case '/agent-jobs/status':  return handleAgentJobStatus(request);
-    default:                return Response.json({ error: 'Not found' }, { status: 404 });
+    case '/oauth/callback':     return handleOAuthCallback(request);
+    default:                    return Response.json({ error: 'Not found' }, { status: 404 });
   }
 }
 

@@ -29,6 +29,8 @@
     "./containers/stream": "./lib/containers/stream.js",
     "./auth/components": "./lib/auth/components/index.js",
     "./middleware": "./lib/auth/middleware.js",
+    "./oauth": "./lib/oauth/helper.js",
+    "./oauth/providers": "./lib/oauth/providers.js",
     "./package.json": "./package.json"
   },
   "files": [
