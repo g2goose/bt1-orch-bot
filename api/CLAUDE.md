@@ -25,6 +25,7 @@ Browser-facing data fetching uses **fetch route handlers** colocated with pages 
 |--------|------|------|---------|
 | GET | `/api/ping` | None | Health check |
 | POST | `/api/create-agent-job` | `x-api-key` | Create agent job |
+| POST | `/api/set-agent-secret` | `x-api-key` | Set/update an agent job secret (for agents to persist rotated credentials) |
 | GET | `/api/agent-jobs/status` | `x-api-key` | Agent job status (query: `?agent_job_id=`) |
 | POST | `/api/telegram/webhook` | Telegram webhook secret | Telegram message handler |
 | POST | `/api/telegram/register` | `x-api-key` | Register bot token + webhook URL |

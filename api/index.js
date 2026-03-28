@@ -104,6 +104,17 @@ async function handleCreateAgentJob(request) {
   }
 }
 
+async function handleSetAgentSecret(request) {
+  const body = await request.json();
+  const { key, value } = body;
+  if (!key || typeof value !== 'string') {
+    return Response.json({ error: 'Missing key or value' }, { status: 400 });
+  }
+  const { setAgentJobSecret } = await import('../lib/db/config.js');
+  setAgentJobSecret(key, value, 'agent');
+  return Response.json({ success: true });
+}
+
 async function handleTelegramRegister(request) {
   const body = await request.json();
   const { bot_token, webhook_url } = body;
@@ -315,6 +326,7 @@ async function POST(request) {
   // Route to handler
   switch (routePath) {
     case '/create-agent-job':     return handleCreateAgentJob(request);
+    case '/set-agent-secret':     return handleSetAgentSecret(request);
     case '/telegram/webhook':   return handleTelegramWebhook(request);
     case '/telegram/register':  return handleTelegramRegister(request);
     case '/github/webhook':     return handleGithubWebhook(request);
