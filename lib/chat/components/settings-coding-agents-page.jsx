@@ -72,6 +72,9 @@ function DefaultAgentSection({ settings, onReload }) {
   if (settings.openCode?.enabled && isOpenCodeReady(settings)) {
     available.push({ value: 'opencode', label: 'OpenCode' });
   }
+  if (settings.kimiCli?.enabled && isKimiCliReady(settings)) {
+    available.push({ value: 'kimi-cli', label: 'Kimi CLI' });
+  }
 
   const handleChange = async (e) => {
     setSaving(true);
@@ -133,6 +136,7 @@ function AgentCards({ settings, onReload }) {
         <GeminiCliCard settings={settings} onReload={onReload} />
         <CodexCliCard settings={settings} onReload={onReload} />
         <OpenCodeCard settings={settings} onReload={onReload} />
+        <KimiCliCard settings={settings} onReload={onReload} />
       </div>
     </div>
   );
@@ -835,6 +839,157 @@ function OpenCodeCard({ settings, onReload }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Kimi CLI card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function KimiCliCard({ settings, onReload }) {
+  const config = settings.kimiCli;
+  const [modelText, setModelText] = useState(config.model || '');
+  const [saved, setSaved] = useState(false);
+
+  const showSaved = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleToggle = async () => {
+    await updateCodingAgentConfig('kimi-cli', { enabled: !config.enabled });
+    await onReload();
+  };
+
+  const handleProviderChange = async (e) => {
+    const newProvider = e.target.value;
+    const cp = settings?.customProviders?.find((p) => p.key === newProvider);
+    const newModel = cp?.models?.[0] || '';
+    setModelText(newModel);
+    await updateCodingAgentConfig('kimi-cli', { provider: newProvider, model: newModel });
+    await onReload();
+    showSaved();
+  };
+
+  const handleModelChange = async (e) => {
+    await updateCodingAgentConfig('kimi-cli', { model: e.target.value });
+    await onReload();
+    showSaved();
+  };
+
+  const handleModelTextSave = async () => {
+    await updateCodingAgentConfig('kimi-cli', { model: modelText });
+    await onReload();
+    showSaved();
+  };
+
+  const availableProviders = [];
+  if (settings?.builtinProviders && settings?.credentialStatuses) {
+    const statusMap = new Map(settings.credentialStatuses.map((s) => [s.key, s.isSet]));
+    for (const [slug, prov] of Object.entries(settings.builtinProviders)) {
+      const hasKey = prov.credentials.some((c) => statusMap.get(c.key));
+      if (hasKey) {
+        availableProviders.push({ slug, name: prov.name });
+      }
+    }
+  }
+  if (settings?.customProviders) {
+    for (const cp of settings.customProviders) {
+      availableProviders.push({ slug: cp.key, name: cp.name });
+    }
+  }
+
+  const ready = isKimiCliReady(settings);
+  const selectedProviderReady = availableProviders.some(p => p.slug === config.provider);
+
+  const builtinModels = config.provider ? getAgentModels(settings, config.provider) : [];
+  const customProvider = settings?.customProviders?.find((p) => p.key === config.provider);
+  const providerModels = builtinModels.length > 0 ? builtinModels : (customProvider?.models || []).map((m) => ({ id: m, name: m }));
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Kimi CLI</span>
+          {config.enabled && <StatusDot ready={ready} />}
+        </div>
+        <div className="flex items-center gap-3">
+          {saved && <span className="text-xs text-green-500 inline-flex items-center gap-1"><CheckIcon size={12} /> Saved</span>}
+          <ToggleSwitch checked={config.enabled} onChange={handleToggle} />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">Coding agent by MoonshotAI with multi-provider support.</p>
+
+      {config.enabled && (
+        <div className="border-t border-border pt-3 space-y-3">
+          {availableProviders.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Provider</label>
+                <select
+                  value={config.provider || ''}
+                  onChange={handleProviderChange}
+                  className="w-48 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground"
+                >
+                  <option value="">Select provider...</option>
+                  {availableProviders.map((p) => (
+                    <option key={p.slug} value={p.slug}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {config.provider && (
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Model</label>
+                  {providerModels.length > 0 ? (
+                    <select
+                      value={config.model || ''}
+                      onChange={handleModelChange}
+                      className="w-48 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground"
+                    >
+                      {!customProvider && <option value="">Default</option>}
+                      {providerModels.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={modelText}
+                      onChange={(e) => setModelText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleModelTextSave()}
+                      placeholder="Model name"
+                      className="w-48 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground"
+                    />
+                  )}
+                </div>
+              )}
+
+              {config.provider && !selectedProviderReady && (
+                <CredentialHint
+                  ready={false}
+                  missingText={`${config.provider} API Key is not set. Configure it on the LLMs page.`}
+                />
+              )}
+
+              {config.provider && providerModels.length === 0 && (
+                <div className="flex justify-end mt-1">
+                  <button onClick={handleModelTextSave} disabled={modelText === (config.model || '')}
+                    className="rounded-md px-3 py-1.5 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors">
+                    Save
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <CredentialHint
+              ready={false}
+              missingText="Configure at least one LLM provider on the LLMs page to use Kimi CLI"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -879,6 +1034,11 @@ function isCodexCliReady(settings) {
 function isOpenCodeReady(settings) {
   if (!settings.openCode?.enabled || !settings.openCode?.provider) return false;
   return isProviderReady(settings, settings.openCode.provider);
+}
+
+function isKimiCliReady(settings) {
+  if (!settings.kimiCli?.enabled || !settings.kimiCli?.provider) return false;
+  return isProviderReady(settings, settings.kimiCli.provider);
 }
 
 function isProviderReady(settings, provider) {
