@@ -13,8 +13,12 @@ if [ -n "$LLM_MODEL" ]; then
     GEMINI_ARGS+=(--model "$LLM_MODEL")
 fi
 
-if [ "$CONTINUE_SESSION" = "1" ]; then
-    GEMINI_ARGS+=(--resume)
+SESSION_FILE="/home/coding-agent/.gemini-ttyd-sessions/7681"
+if [ "$CONTINUE_SESSION" = "1" ] && [ -f "$SESSION_FILE" ]; then
+    SESSION_ID=$(cat "$SESSION_FILE")
+    if [ -n "$SESSION_ID" ] && gemini --list-sessions 2>/dev/null | grep -qF "$SESSION_ID"; then
+        GEMINI_ARGS+=(--resume "$SESSION_ID")
+    fi
 fi
 
 set +e

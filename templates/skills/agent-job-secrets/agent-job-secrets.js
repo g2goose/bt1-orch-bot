@@ -32,7 +32,7 @@ if (!appUrl) { console.error('APP_URL not available'); process.exit(1); }
 
 if (cmd === 'get') {
   if (!key) { console.error('Usage: agent-job-secrets.js get KEY_NAME'); process.exit(1); }
-  const res = await fetch(`${appUrl}/api/get-agent-secret?key=${encodeURIComponent(key)}`, {
+  const res = await fetch(`${appUrl}/api/get-agent-job-secret?key=${encodeURIComponent(key)}`, {
     headers: { 'x-api-key': apiKey },
   });
   const json = await res.json();
@@ -51,7 +51,7 @@ if (cmd === 'set') {
   if (value === undefined) {
     value = readFileSync('/dev/stdin', 'utf8').trim();
   }
-  const res = await fetch(`${appUrl}/api/set-agent-secret`, {
+  const res = await fetch(`${appUrl}/api/set-agent-job-secret`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
     body: JSON.stringify({ key, value }),

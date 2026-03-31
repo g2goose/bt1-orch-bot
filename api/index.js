@@ -11,6 +11,9 @@ import { getConfig } from '../lib/config.js';
 import { parseOAuthState, exchangeCodeForToken } from '../lib/oauth/helper.js';
 import { setAgentJobSecret } from '../lib/db/config.js';
 
+// ── Per-key lock for OAuth token refresh ────────────────────────────
+const _refreshLocks = new Map();
+
 // Bot token — resolved from DB/env, can be overridden by /telegram/register
 let telegramBotToken = null;
 
@@ -105,6 +108,11 @@ async function handleCreateAgentJob(request) {
 }
 
 async function handleGetAgentSecret(request) {
+  const record = verifyApiKey(request.headers.get('x-api-key'));
+  if (record.type !== 'agent_job_api_key') {
+    return Response.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const key = new URL(request.url).searchParams.get('key');
   if (!key) return Response.json({ error: 'Missing key' }, { status: 400 });
 
@@ -112,32 +120,58 @@ async function handleGetAgentSecret(request) {
   const raw = getAgentJobSecretRaw(key);
   if (!raw) return Response.json({ error: 'Not found' }, { status: 404 });
 
+  let parsed;
   try {
-    const parsed = JSON.parse(raw);
-    if (parsed.type === 'oauth2') {
-      const { refreshOAuthToken } = await import('../lib/oauth/helper.js');
-      const newToken = await refreshOAuthToken({
-        refreshToken: parsed.token.refresh_token,
-        clientId: parsed.clientId,
-        clientSecret: parsed.clientSecret,
-        tokenUrl: parsed.tokenUrl,
-      });
-      // Persist updated token (refresh token may have rotated)
-      saveSecret(key, JSON.stringify({ ...parsed, token: newToken }), 'refresh');
-      return Response.json({ value: JSON.stringify(newToken) });
-    }
-    if (parsed.type === 'oauth_token') {
-      return Response.json({ value: JSON.stringify(parsed.token) });
-    }
-    // Unknown structured value — return raw
-    return Response.json({ value: raw });
+    parsed = JSON.parse(raw);
   } catch {
     // Plain string
     return Response.json({ value: raw });
   }
+
+  if (parsed.type === 'oauth2') {
+    // Serialize refresh per key — prevents concurrent requests from racing on token rotation
+    if (!_refreshLocks.has(key)) _refreshLocks.set(key, Promise.resolve());
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const prev = _refreshLocks.get(key);
+    _refreshLocks.set(key, gate);
+    await prev;
+
+    try {
+      // Re-read after acquiring lock — previous request may have already refreshed
+      const freshRaw = getAgentJobSecretRaw(key);
+      const freshParsed = freshRaw ? JSON.parse(freshRaw) : parsed;
+
+      const { refreshOAuthToken } = await import('../lib/oauth/helper.js');
+      const newToken = await refreshOAuthToken({
+        refreshToken: freshParsed.token.refresh_token,
+        clientId: freshParsed.clientId,
+        clientSecret: freshParsed.clientSecret,
+        tokenUrl: freshParsed.tokenUrl,
+      });
+      // Persist updated token (refresh token may have rotated)
+      saveSecret(key, JSON.stringify({ ...freshParsed, token: { ...freshParsed.token, ...newToken } }), 'refresh');
+      return Response.json({ value: newToken.access_token });
+    } catch (err) {
+      console.error(`[secrets] OAuth refresh failed for "${key}":`, err.message);
+      return Response.json({ error: `OAuth refresh failed: ${err.message}` }, { status: 502 });
+    } finally {
+      release();
+    }
+  }
+  if (parsed.type === 'oauth_token') {
+    return Response.json({ value: JSON.stringify(parsed.token) });
+  }
+  // Unknown structured value — return raw
+  return Response.json({ value: raw });
 }
 
 async function handleSetAgentSecret(request) {
+  const record = verifyApiKey(request.headers.get('x-api-key'));
+  if (record.type !== 'agent_job_api_key') {
+    return Response.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const body = await request.json();
   const { key, value } = body;
   if (!key || typeof value !== 'string') {
@@ -371,7 +405,7 @@ async function POST(request) {
   // Route to handler
   switch (routePath) {
     case '/create-agent-job':     return handleCreateAgentJob(request);
-    case '/set-agent-secret':     return handleSetAgentSecret(request);
+    case '/set-agent-job-secret':  return handleSetAgentSecret(request);
     case '/telegram/webhook':   return handleTelegramWebhook(request);
     case '/telegram/register':  return handleTelegramRegister(request);
     case '/github/webhook':     return handleGithubWebhook(request);
@@ -390,7 +424,7 @@ async function GET(request) {
   switch (routePath) {
     case '/ping':               return Response.json({ message: 'Pong!' });
     case '/agent-jobs/status':  return handleAgentJobStatus(request);
-    case '/get-agent-secret':   return handleGetAgentSecret(request);
+    case '/get-agent-job-secret':   return handleGetAgentSecret(request);
     case '/oauth/callback':     return handleOAuthCallback(request);
     default:                    return Response.json({ error: 'Not found' }, { status: 404 });
   }

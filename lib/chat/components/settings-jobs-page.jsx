@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { PlusIcon, CopyIcon, CheckIcon, SpinnerIcon } from './icons.js';
-import { SecretRow, Dialog, EmptyState } from './settings-shared.js';
+import { PlusIcon, CopyIcon, CheckIcon, SpinnerIcon, TrashIcon } from './icons.js';
+import { SecretRow, StatusBadge, Dialog, EmptyState } from './settings-shared.js';
 import { OAUTH_PROVIDERS } from '../../oauth/providers.js';
 import {
   getAgentJobSecrets,
@@ -183,7 +183,7 @@ function ProviderCombobox({ value, onChange, inputClass }) {
 // Unified add secret dialog (manual + OAuth modes)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
+function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess, editingSecret }) {
   // Shared state
   const [mode, setMode] = useState('manual');
   const [name, setName] = useState('');
@@ -209,8 +209,8 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
   // Reset all state on open
   useEffect(() => {
     if (open) {
-      setMode('manual');
-      setName('');
+      setMode(editingSecret ? 'oauth' : 'manual');
+      setName(editingSecret?.key || '');
       setError(null);
       // Manual
       setValue('');
@@ -224,7 +224,7 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
       setStatus('form');
       setCopied(false);
       setRedirectUri(`${window.location.origin}/api/oauth/callback`);
-      setTimeout(() => nameRef.current?.focus(), 50);
+      if (!editingSecret) setTimeout(() => nameRef.current?.focus(), 50);
     }
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -344,7 +344,7 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
   const inputClass = 'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground';
 
   return (
-    <Dialog open={open} onClose={onCancel} title="Add Secret">
+    <Dialog open={open} onClose={onCancel} title={editingSecret ? 'Re-authorize Secret' : 'Add Secret'}>
       {status === 'success' ? (
         <div className="flex items-center justify-center gap-2 py-8 text-green-500">
           <CheckIcon size={20} />
@@ -359,31 +359,33 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
       ) : (
         <>
           <div className="space-y-3">
-            {/* Mode toggle */}
-            <div className="flex rounded-md border border-border overflow-hidden">
-              <button
-                type="button"
-                onClick={() => handleModeChange('manual')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
-                  mode === 'manual'
-                    ? 'bg-foreground text-background'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-              >
-                Manual
-              </button>
-              <button
-                type="button"
-                onClick={() => handleModeChange('oauth')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
-                  mode === 'oauth'
-                    ? 'bg-foreground text-background'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-              >
-                OAuth
-              </button>
-            </div>
+            {/* Mode toggle — hidden when re-authorizing */}
+            {!editingSecret && (
+              <div className="flex rounded-md border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('manual')}
+                  className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                    mode === 'manual'
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                >
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('oauth')}
+                  className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                    mode === 'oauth'
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                >
+                  OAuth
+                </button>
+              </div>
+            )}
 
             {/* Secret name — shared */}
             <div>
@@ -394,7 +396,8 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
                 value={name}
                 onChange={(e) => setName(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
                 placeholder={mode === 'manual' ? 'e.g. GOOGLE_SERVICE_ACCOUNT_KEY' : 'e.g. GOOGLE_OAUTH_TOKEN'}
-                className={inputClass}
+                className={`${inputClass}${editingSecret ? ' text-muted-foreground bg-muted' : ''}`}
+                readOnly={!!editingSecret}
                 onKeyDown={(e) => e.key === 'Enter' && mode === 'manual' && handleSave()}
               />
             </div>
@@ -523,6 +526,53 @@ function AddSecretDialog({ open, onAdd, onCancel, onOAuthSuccess }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OAuth secret row — Re-authorize instead of inline edit
+// ─────────────────────────────────────────────────────────────────────────────
+
+function OAuthSecretRow({ secret, onReauthorize, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    await onDelete();
+    setConfirmDelete(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between py-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-sm font-medium font-mono">{secret.key}</span>
+        <span className="text-xs text-muted-foreground">OAuth</span>
+        <StatusBadge isSet={secret.isSet} />
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+        <button
+          onClick={onReauthorize}
+          className="rounded-md px-2.5 py-1.5 text-xs font-medium border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          Re-authorize
+        </button>
+        <button
+          onClick={handleDelete}
+          className={`rounded-md p-1.5 text-xs border transition-colors ${
+            confirmDelete
+              ? 'border-destructive text-destructive hover:bg-destructive/10'
+              : 'border-border text-muted-foreground hover:text-destructive hover:border-destructive'
+          }`}
+          title={confirmDelete ? 'Click again to confirm' : 'Delete'}
+        >
+          <TrashIcon size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Jobs page
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -530,6 +580,7 @@ export function JobsPage() {
   const [secrets, setSecrets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [reauthorizing, setReauthorizing] = useState(null);
 
   const loadSecrets = async () => {
     try {
@@ -591,6 +642,13 @@ export function JobsPage() {
         onCancel={() => setShowAdd(false)}
         onOAuthSuccess={loadSecrets}
       />
+      <AddSecretDialog
+        open={!!reauthorizing}
+        onAdd={handleAdd}
+        onCancel={() => setReauthorizing(null)}
+        onOAuthSuccess={loadSecrets}
+        editingSecret={reauthorizing}
+      />
       {secrets.length === 0 ? (
         <EmptyState
           message="No job secrets configured yet."
@@ -600,7 +658,14 @@ export function JobsPage() {
       ) : (
         <div className="rounded-lg border bg-card p-4">
           <div className="divide-y divide-border">
-            {secrets.map((s) => (
+            {secrets.map((s) => s.secretType === 'oauth2' ? (
+              <OAuthSecretRow
+                key={s.key}
+                secret={s}
+                onReauthorize={() => setReauthorizing(s)}
+                onDelete={() => handleDelete(s.key)}
+              />
+            ) : (
               <SecretRow
                 key={s.key}
                 label={s.key}
