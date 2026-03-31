@@ -12,7 +12,6 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedByDefault=false
       - --providers.file.directory=/traefik-config/
-      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
     volumes:
