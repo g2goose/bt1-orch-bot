@@ -14,6 +14,9 @@
 # Skills dependencies (installed at runtime in Docker for correct arch)
 skills/*/node_modules/
 
+# Dynamically activated skills (created at container runtime, not user config)
+skills/active/agent-job-secrets
+
 # Database
 data/
 

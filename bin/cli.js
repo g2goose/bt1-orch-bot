@@ -273,7 +273,7 @@ async function init() {
   }
 
   // Create default skill activation symlinks
-  const defaultSkills = ['agent-job-secrets'];
+  const defaultSkills = [];
   const activeDir = path.join(cwd, 'skills', 'active');
   fs.mkdirSync(activeDir, { recursive: true });
   for (const skill of defaultSkills) {
