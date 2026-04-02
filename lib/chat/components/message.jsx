@@ -154,16 +154,28 @@ function ToolCall({ part, className }) {
         <span className="flex flex-col min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="font-medium text-foreground">{displayName}</span>
-            {isDone && (() => {
+            {(() => {
               try {
-                const o = typeof part.output === 'string' ? JSON.parse(part.output) : part.output;
-                const meta = Array.isArray(o) ? o.find(e => e.type === 'meta') : o;
-                if (meta?.codingAgent || meta?.backendApi) {
+                // Read from input (available immediately) or output meta (historical chats)
+                const agent = part.input?.codingAgent;
+                const backend = part.input?.backendApi;
+                if (agent || backend) {
                   return (
                     <span className="text-xs text-muted-foreground">
-                      {[meta.codingAgent, meta.backendApi].filter(Boolean).join(' · ')}
+                      {[agent, backend].filter(Boolean).join(' · ')}
                     </span>
                   );
+                }
+                if (isDone) {
+                  const o = typeof part.output === 'string' ? JSON.parse(part.output) : part.output;
+                  const meta = Array.isArray(o) ? o.find(e => e.type === 'meta') : o;
+                  if (meta?.codingAgent || meta?.backendApi) {
+                    return (
+                      <span className="text-xs text-muted-foreground">
+                        {[meta.codingAgent, meta.backendApi].filter(Boolean).join(' · ')}
+                      </span>
+                    );
+                  }
                 }
               } catch {}
               return null;
