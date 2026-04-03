@@ -26,7 +26,7 @@ trust_level = "trusted"
 
 [mcp_servers.playwright]
 command = "npx"
-args = ["-y", "@playwright/mcp@0.0.70", "--headless", "--browser", "chromium"]
+args = ["-y", "@playwright/mcp@0.0.70", "--headless", "--browser", "chromium", "--output-dir", "/tmp/playwright-output"]
 env = { PLAYWRIGHT_BROWSERS_PATH = "/opt/pw-browsers" }
 EOF
 

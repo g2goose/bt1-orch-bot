@@ -741,6 +741,15 @@ export default function TerminalView({ codeWorkspaceId, wsPath, isActive = true,
                   )}
                 </div>
               )}
+              {diffStats?.currentBranch && (
+                <button
+                  className="code-toolbar-btn"
+                  style={{ cursor: 'default', opacity: 0.7, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={diffStats.currentBranch}
+                >
+                  {diffStats.currentBranch}
+                </button>
+              )}
               <ToolbarCommandButton
                 codeWorkspaceId={codeWorkspaceId}
                 diffStats={diffStats}

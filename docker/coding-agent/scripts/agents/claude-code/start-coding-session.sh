@@ -10,18 +10,18 @@ fi
 
 # Build Claude args
 SESSION_FILE="/home/coding-agent/.claude-ttyd-sessions/${PORT}"
-CLAUDE_ARGS="claude --dangerously-skip-permissions"
+CLAUDE_ARGS=(claude --dangerously-skip-permissions)
 if [ -n "$LLM_MODEL" ]; then
-    CLAUDE_ARGS="$CLAUDE_ARGS --model $LLM_MODEL"
+    CLAUDE_ARGS+=(--model "$LLM_MODEL")
 fi
 
 if [ -f "$SESSION_FILE" ]; then
     SESSION_ID=$(cat "$SESSION_FILE")
     if [ -f "/home/coding-agent/.claude/projects/-home-coding-agent-workspace/${SESSION_ID}.jsonl" ]; then
-        CLAUDE_ARGS="$CLAUDE_ARGS --resume $SESSION_ID"
+        CLAUDE_ARGS+=(--resume "$SESSION_ID")
     fi
 fi
 
 # Start tmux session with Claude, then attach
-tmux -u new-session -d -s "$SESSION_NAME" -e PORT="${PORT}" -c /home/coding-agent/workspace $CLAUDE_ARGS
+tmux -u new-session -d -s "$SESSION_NAME" -e PORT="${PORT}" -c /home/coding-agent/workspace "${CLAUDE_ARGS[@]}"
 exec tmux attach -t "$SESSION_NAME"
