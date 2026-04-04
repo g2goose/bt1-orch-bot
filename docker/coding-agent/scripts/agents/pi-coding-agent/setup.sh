@@ -10,7 +10,7 @@ ln -sf ../library/playwright-cli skills/active/playwright-cli 2>/dev/null || tru
 
 # Activate agent-job-secrets skill when token is available (agent chat mode only)
 if [ -n "$AGENT_JOB_TOKEN" ]; then
-  ln -sf ../library/agent-job-secrets skills/active/agent-job-secrets 2>/dev/null || true
+  ln -sfn ../library/agent-job-secrets skills/active/agent-job-secrets 2>/dev/null || true
 fi
 
 # Always write system prompt (clears previous if SYSTEM_PROMPT is empty)
